@@ -2,16 +2,13 @@
 declare(strict_types=1);
 
 /**
- * Pimcore
- *
- * This source file is available under two different licenses:
- * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Commercial License (PCL)
+ * This source file is available under the terms of the
+ * Pimcore Open Core License (POCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ *  @copyright  Copyright (c) Pimcore GmbH (https://www.pimcore.com)
+ *  @license    Pimcore Open Core License (POCL)
  */
 
 namespace Pimcore\Model\DataObject;
@@ -39,6 +36,7 @@ use Pimcore\Model\DataObject\ClassDefinition\DynamicOptionsProvider\SelectOption
 use Pimcore\Model\Element;
 use Pimcore\Model\Element\DirtyIndicatorInterface;
 use Pimcore\Model\Element\ElementInterface;
+use Pimcore\Model\User;
 use Pimcore\Tool;
 use Pimcore\Tool\Admin as AdminTool;
 use Pimcore\Tool\Session;
@@ -68,16 +66,6 @@ class Service extends Model\Element\Service
      *
      */
     protected static array $systemFields = ['path', 'key', 'id', 'published', 'creationDate', 'modificationDate', 'fullpath'];
-
-    /**
-     * TODO Bc layer for bundles to support both Pimcore 10 & 11, remove with Pimcore 12
-     *
-     * @var string[]
-     */
-    private const BC_VERSION_DEPENDENT_DATABASE_COLUMNS = ['id', 'parentid', 'type', 'key', 'path', 'index', 'published',
-                                                                'creationdate', 'modificationdate', 'userowner', 'usermodification',
-                                                                'classid', 'childrensortby', 'classname', 'childrensortorder',
-                                                                'versioncount', ];
 
     public function __construct(?Model\User $user = null)
     {
@@ -1087,7 +1075,7 @@ class Service extends Model\Element\Service
     /**
      * @internal
      */
-    public static function getCustomGridFieldDefinitions(string $classId, int $objectId): ?array
+    public static function getCustomGridFieldDefinitions(string $classId, int $objectId, ?User $user = null): ?array
     {
         $object = DataObject::getById($objectId);
 
@@ -1098,7 +1086,8 @@ class Service extends Model\Element\Service
             return null;
         }
 
-        $user = AdminTool::getCurrentUser();
+        $user = self::getUser($user);
+
         if ($user->isAdmin()) {
             return null;
         }
@@ -1260,8 +1249,11 @@ class Service extends Model\Element\Service
      *
      * @internal
      */
-    public static function getCustomLayoutDefinitionForGridColumnConfig(ClassDefinition $class, int $objectId): array
-    {
+    public static function getCustomLayoutDefinitionForGridColumnConfig(
+        ClassDefinition $class,
+        int $objectId,
+        ?User $user = null
+    ): array {
         $layoutDefinitions = $class->getLayoutDefinitions();
 
         $result = [
@@ -1272,7 +1264,7 @@ class Service extends Model\Element\Service
             return $result;
         }
 
-        $user = AdminTool::getCurrentUser();
+        $user = self::getUser($user);
 
         if ($user->isAdmin()) {
             return $result;
@@ -1337,8 +1329,12 @@ class Service extends Model\Element\Service
      *
      * @internal
      */
-    public static function enrichLayoutDefinition(ClassDefinition\Data|ClassDefinition\Layout|null &$layout, ?Concrete $object = null, array $context = []): void
-    {
+    public static function enrichLayoutDefinition(
+        ClassDefinition\Data|ClassDefinition\Layout|null &$layout,
+        ?Concrete $object = null,
+        array $context = [],
+        ?User $user = null
+    ): void {
         if (is_null($layout)) {
             return;
         }
@@ -1350,11 +1346,11 @@ class Service extends Model\Element\Service
         }
 
         if ($layout instanceof Model\DataObject\ClassDefinition\Data\Localizedfields || $layout instanceof Model\DataObject\ClassDefinition\Data\Classificationstore && $layout->localized === true) {
-            $user = AdminTool::getCurrentUser();
+            $user = self::getUser($user);
             if (!$user->isAdmin() && ($context['purpose'] ?? null) !== 'gridconfig' && $object) {
                 $allowedView = self::getLanguagePermissions($object, $user, 'lView');
                 $allowedEdit = self::getLanguagePermissions($object, $user, 'lEdit');
-                self::enrichLayoutPermissions($layout, $allowedView, $allowedEdit);
+                self::enrichLayoutPermissions($layout, $allowedView, $allowedEdit, $user);
             }
 
             if (isset($context['containerType']) && $context['containerType'] === 'fieldcollection') {
@@ -1377,7 +1373,7 @@ class Service extends Model\Element\Service
                 }
 
                 foreach ($children as $child) {
-                    self::enrichLayoutDefinition($child, $object, $context);
+                    self::enrichLayoutDefinition($child, $object, $context, $user);
                 }
             }
         }
@@ -1386,8 +1382,12 @@ class Service extends Model\Element\Service
     /**
      * @internal
      */
-    public static function enrichLayoutPermissions(ClassDefinition\Data &$layout, ?array $allowedView, ?array $allowedEdit): void
-    {
+    public static function enrichLayoutPermissions(
+        ClassDefinition\Data &$layout,
+        ?array $allowedView,
+        ?array $allowedEdit,
+        ?User $user = null
+    ): void {
         if ($layout instanceof Model\DataObject\ClassDefinition\Data\Localizedfields || $layout instanceof Model\DataObject\ClassDefinition\Data\Classificationstore && $layout->localized === true) {
             if (is_array($allowedView) && count($allowedView) > 0) {
                 $haveAllowedViewDefault = null;
@@ -1400,7 +1400,7 @@ class Service extends Model\Element\Service
                 if (!($haveAllowedViewDefault && count($allowedView) == 0)) {
                     $layout->setPermissionView(
                         AdminTool::reorderWebsiteLanguages(
-                            AdminTool::getCurrentUser(),
+                            self::getUser($user),
                             array_keys($allowedView),
                             true
                         )
@@ -1419,7 +1419,7 @@ class Service extends Model\Element\Service
                 if (!($haveAllowedEditDefault && count($allowedEdit) == 0)) {
                     $layout->setPermissionEdit(
                         AdminTool::reorderWebsiteLanguages(
-                            AdminTool::getCurrentUser(),
+                            self::getUser($user),
                             array_keys($allowedEdit),
                             true
                         )
@@ -1431,7 +1431,7 @@ class Service extends Model\Element\Service
                 $children = $layout->getChildren();
                 if (is_array($children)) {
                     foreach ($children as $child) {
-                        self::enrichLayoutPermissions($child, $allowedView, $allowedEdit);
+                        self::enrichLayoutPermissions($child, $allowedView, $allowedEdit, self::getUser($user));
                     }
                 }
             }
@@ -1615,7 +1615,7 @@ class Service extends Model\Element\Service
             if ($lastChar === '%') {
                 $conditionParts[] = $key . ' LIKE ' . $db->quote($value);
             } else {
-                $conditionParts[] = $key . ' = ' . $db->quote($value);
+                $conditionParts[] = $key . ' = ' . $db->quote((string)$value);
             }
         }
 
@@ -1906,31 +1906,6 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * TODO Bc layer for bundles to support both Pimcore 10 & 11, remove with Pimcore 12
-     *
-     * Returns the version dependent field name for all system fields defined in $versionDependentSystemFields.
-     *
-     * E.g.
-     * Pass o_id in Pimcore 10, get o_id
-     * Pass id in Pimcore 10, get o_id
-     * Pass o_id in Pimcore 11, get id
-     * Pass id in Pimcore 11, get id
-     */
-    public static function getVersionDependentDatabaseColumnName(string $fieldName): string
-    {
-        $newFieldName = $fieldName;
-        if (str_starts_with($newFieldName, 'o_')) {
-            $newFieldName = substr($newFieldName, 2);
-        }
-
-        if (in_array(strtolower($newFieldName), self::BC_VERSION_DEPENDENT_DATABASE_COLUMNS)) {
-            return $newFieldName;
-        }
-
-        return $fieldName;
-    }
-
-    /**
      * @deprecated Since 11.3, please use \Pimcore\Bundle\AdminBundle\Service\DataObject::getInheritedData() instead
      */
     protected static function getInheritedData(Concrete $object, string $key, string $requestedLanguage): array
@@ -1959,5 +1934,10 @@ class Service extends Model\Element\Service
         } finally {
             DataObject::setGetInheritedValues($backup);
         }
+    }
+
+    private static function getUser(?User $user = null): ?User
+    {
+        return $user ?? AdminTool::getCurrentUser();
     }
 }

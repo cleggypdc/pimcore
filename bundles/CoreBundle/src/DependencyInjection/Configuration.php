@@ -2,16 +2,13 @@
 declare(strict_types=1);
 
 /**
- * Pimcore
- *
- * This source file is available under two different licenses:
- * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Commercial License (PCL)
+ * This source file is available under the terms of the
+ * Pimcore Open Core License (POCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ *  @copyright  Copyright (c) Pimcore GmbH (https://www.pimcore.com)
+ *  @license    Pimcore Open Core License (POCL)
  */
 
 namespace Pimcore\Bundle\CoreBundle\DependencyInjection;
@@ -134,6 +131,8 @@ final class Configuration implements ConfigurationInterface
         $this->addTemplatingEngineNode($rootNode);
         $this->addGotenbergNode($rootNode);
         $this->addDependencyNode($rootNode);
+        $this->addProductRegistrationNode($rootNode);
+
         $storageNode = ConfigurationHelper::addConfigLocationWithWriteTargetNodes($rootNode, [
             'image_thumbnails' => PIMCORE_CONFIGURATION_DIRECTORY . '/image_thumbnails',
             'video_thumbnails' => PIMCORE_CONFIGURATION_DIRECTORY . '/video_thumbnails',
@@ -472,6 +471,7 @@ final class Configuration implements ConfigurationInterface
                                                 ->booleanNode('preserveMetaData')->end()
                                                 ->booleanNode('rasterizeSVG')->end()
                                                 ->booleanNode('downloadable')->end()
+                                                ->booleanNode('forceProcessICCProfiles')->end()
                                                 ->integerNode('modificationDate')->end()
                                                 ->integerNode('creationDate')->end()
                                                 ->booleanNode('preserveAnimation')->end()
@@ -2052,6 +2052,9 @@ final class Configuration implements ConfigurationInterface
                         ->scalarNode('base_url')
                             ->defaultValue('http://gotenberg:3000')
                         ->end()
+                        ->scalarNode('ping_cache_ttl')
+                            ->defaultValue(60)
+                        ->end()
                     ->end()
                 ->end()
             ->end();
@@ -2070,5 +2073,22 @@ final class Configuration implements ConfigurationInterface
                 ->end()
             ->end()
         ->end();
+    }
+
+    private function addProductRegistrationNode(ArrayNodeDefinition $rootNode): void
+    {
+        $rootNode->children()
+            ->arrayNode('product_registration')
+                ->children()
+                    ->scalarNode('instance_identifier')
+                        ->info('Unique identifier of that Pimcore instance. Will be generated during install.')
+                    ->end()
+                    ->scalarNode('product_key')
+                        ->info('Product registration key obtained during product registration. ' .
+                               'It is based on `instance_identifier` and `pimcore.encryption.secret`.')
+                    ->end()
+                ->end()
+            ->end()
+        ;
     }
 }

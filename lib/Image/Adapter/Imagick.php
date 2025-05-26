@@ -2,16 +2,13 @@
 declare(strict_types=1);
 
 /**
- * Pimcore
- *
- * This source file is available under two different licenses:
- * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Commercial License (PCL)
+ * This source file is available under the terms of the
+ * Pimcore Open Core License (POCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ *  @copyright  Copyright (c) Pimcore GmbH (https://www.pimcore.com)
+ *  @license    Pimcore Open Core License (POCL)
  */
 
 namespace Pimcore\Image\Adapter;
@@ -62,7 +59,6 @@ class Imagick extends Adapter
         }
 
         if ($this->resource) {
-            unset($this->resource);
             $this->resource = null;
         }
 
@@ -337,14 +333,15 @@ class Imagick extends Adapter
     {
         $imageColorspace = $this->resource->getImageColorspace();
 
-        if (in_array($imageColorspace, [\Imagick::COLORSPACE_RGB, \Imagick::COLORSPACE_SRGB])) {
+        if (!$this->isForceProcessICCProfiles() &&
+            in_array($imageColorspace, [\Imagick::COLORSPACE_RGB, \Imagick::COLORSPACE_SRGB])) {
             // no need to process (s)RGB images
             return $this;
         }
 
         $profiles = $this->resource->getImageProfiles('icc', true);
 
-        if (isset($profiles['icc'])) {
+        if (!$this->isForceProcessICCProfiles() && isset($profiles['icc'])) {
             if (str_contains($profiles['icc'], 'RGB')) {
                 // no need to process (s)RGB images
                 return $this;
@@ -760,6 +757,10 @@ class Imagick extends Adapter
                     $frame->compositeImage($newImage, $compositeValue, $x, $y);
                 }
             } else {
+                // Transform base image to RGB colorspace if the watermark is in RGB or sRGB
+                if (in_array($newImage->getImageColorspace(), [\Imagick::COLORSPACE_RGB, \Imagick::COLORSPACE_SRGB])) {
+                    $this->setColorspaceToRGB();
+                }
                 $this->resource->compositeImage($newImage, $compositeValue, $x, $y);
             }
         }

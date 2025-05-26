@@ -1,16 +1,13 @@
 <?php
 
 /**
- * Pimcore
- *
- * This source file is available under two different licenses:
- * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Commercial License (PCL)
+ * This source file is available under the terms of the
+ * Pimcore Open Core License (POCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ *  @copyright  Copyright (c) Pimcore GmbH (https://www.pimcore.com)
+ *  @license    Pimcore Open Core License (POCL)
  */
 
 namespace Pimcore\Model\Asset;
@@ -118,7 +115,7 @@ class Dao extends Model\Element\Dao
         foreach ($asset as $key => $value) {
             if (in_array($key, $this->getValidTableColumns('assets'))) {
                 if (is_array($value)) {
-                    $value = Serialize::serialize($value);
+                    $value = Serialize::toJson($value);
                 }
                 $data[$key] = $value;
             }
@@ -493,7 +490,7 @@ class Dao extends Model\Element\Dao
 
     public function updateCustomSettings(): void
     {
-        $customSettingsData = Serialize::serialize($this->model->getCustomSettings());
+        $customSettingsData = Serialize::toJson($this->model->getCustomSettings());
         $this->db->update('assets', ['customSettings' => $customSettingsData], ['id' => $this->model->getId()]);
     }
 
